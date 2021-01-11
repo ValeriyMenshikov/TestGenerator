@@ -275,26 +275,26 @@ class Swagger:
 
         if any([params, json_request, headers]) and path_parameters:
             code = f"""
-        @logger('{description}')
+        @step('{description}')
         def {method}_{method_name}(self, data: dict) -> Response:
             end_point = f'{end_point}'
             return self.app.api.{method}(url=self.app.base_url + end_point, **data["request"])""".format(
                 **path_parameters)
         elif any([params, json_request, headers]) and not path_parameters:
             code = f"""
-        @logger('{description}')
+        @step('{description}')
         def {method}_{method_name}(self, data: dict) -> Response:
             end_point = f'{end_point}'
             return self.app.api.{method}(url=self.app.base_url + end_point, **data["request"])"""
         elif params == json_request == headers == path_parameters is None:
             code = f"""
-        @logger('{description}')
+        @step('{description}')
         def {method}_{method_name}(self) -> Response:
             end_point = f'{end_point}'
             return self.app.api.{method}(url=self.app.base_url + end_point)"""
         elif params == json_request == headers is None and path_parameters:
             code = f"""
-        @logger('{description}')
+        @step('{description}')
         def {method}_{method_name}(self, data: dict) -> Response:
             end_point = f'{end_point}'
             return self.app.api.{method}(url=self.app.base_url + end_point)""".format(**path_parameters)
@@ -327,7 +327,7 @@ class Swagger:
         result = []
         s = f"""import requests
 from requests.models import Response
-from logger.logger import logger
+from ozlogger.step_wrapper import step
 
 
 class {self.service_name()}:
@@ -417,7 +417,7 @@ class {self.service_name()}:
 
     def create_app_fixture(self, write=False):
         service_name = self.service_name()
-        app_sting = f'''from requests import Session
+        app_sting = f'''from ozrestclient.restclient import RestClient
 from services.{service_name.lower()} import {service_name}
         
         
@@ -425,8 +425,7 @@ class Application:
     def __init__(self, base_url=None, headers=None):
         self.{service_name.lower()} = {service_name}(self)
         self.base_url = base_url
-        self.api = Session()
-        self.api.headers = self.headers
+        self.api = RestClient(host=base_url, headers=headers)
         '''
         if write:
             Path('fixture').mkdir(parents=True, exist_ok=True)

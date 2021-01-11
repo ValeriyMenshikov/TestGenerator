@@ -1,8 +1,15 @@
 from pathlib import Path
-import re
+from tkinter import filedialog, Tk
 from code_generator import Swagger
+import os
+import re
 
 if __name__ == '__main__':
+    print('Выбери папку куда сохранить проект')
+    root = Tk()
+    root.withdraw()
+    folder_selected = filedialog.askdirectory()
+    os.chdir(folder_selected)
     while True:
         url = str(input('Введи Swagger url:'))
         regex = re.compile(
