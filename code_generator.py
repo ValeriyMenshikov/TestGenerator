@@ -1,11 +1,12 @@
-import pprint
 import requests
 import re
 from pathlib import Path
 import json
 from ast import literal_eval
+from sys import platform
+import subprocess
+import sys
 import os
-from colorama import Fore, Style
 import datetime
 
 now = datetime.datetime.now()
@@ -22,16 +23,40 @@ class Swagger:
     PUT = 'put'
     DELETE = 'delete'
 
-    def __init__(self, url=None, obj=None):
+    def __init__(self, url=None, obj=None, folder=None):
         if url:
             self.swagger_dict = requests.get(url).json()
         elif obj:
             self.swagger_dict = obj
 
+        self.folder = folder
+        self.host_name = os.path.dirname(url)
+
     # TODO сделать по человечески через проперти
     # def __init__(self, url):
     #     with open(url, errors='ignore', encoding='UTF-8') as f:
     #         self.swagger_dict = json.load(f)
+
+    def create_qa_config(self, path):
+        with open(Path(path).joinpath('qa.yaml'), 'w') as qa:
+            qa.write(f"""api:
+  host: {self.host_name}
+user:
+  user: testuser
+  password: test
+  store: 15707897807000""")
+
+    def create_env(self, requirements_path):
+        if not os.path.exists(self.folder):
+            subprocess.call([sys.executable, '-m', 'venv', self.folder])
+            if platform == "win32":
+                python_interpreter = os.path.join(self.folder, 'Scripts', 'python.exe')
+            else:
+                python_interpreter = os.path.join(self.folder, 'bin', 'python')
+            subprocess.call([python_interpreter, '-m', 'pip', 'install', '--upgrade', 'pip'])
+            subprocess.call([python_interpreter, '-m', 'pip', 'install', '-r', requirements_path])
+        else:
+            print("INFO: %s exists." % (self.folder))
 
     def all(self):
         """
@@ -278,26 +303,26 @@ class Swagger:
         @step('{description}')
         def {method}_{method_name}(self, data: dict) -> Response:
             end_point = f'{end_point}'
-            return self.app.api.{method}(url=self.app.base_url + end_point, **data["request"])""".format(
+            return self.app.api.{method}(end_point, **data["request"])""".format(
                 **path_parameters)
         elif any([params, json_request, headers]) and not path_parameters:
             code = f"""
         @step('{description}')
         def {method}_{method_name}(self, data: dict) -> Response:
             end_point = f'{end_point}'
-            return self.app.api.{method}(url=self.app.base_url + end_point, **data["request"])"""
+            return self.app.api.{method}(end_point, **data["request"])"""
         elif params == json_request == headers == path_parameters is None:
             code = f"""
         @step('{description}')
         def {method}_{method_name}(self) -> Response:
             end_point = f'{end_point}'
-            return self.app.api.{method}(url=self.app.base_url + end_point)"""
+            return self.app.api.{method}(end_point)"""
         elif params == json_request == headers is None and path_parameters:
             code = f"""
         @step('{description}')
         def {method}_{method_name}(self, data: dict) -> Response:
             end_point = f'{end_point}'
-            return self.app.api.{method}(url=self.app.base_url + end_point)""".format(**path_parameters)
+            return self.app.api.{method}(end_point)""".format(**path_parameters)
         else:
             raise AssertionError(f'Не обработанный случай, {data}, {params}, {path_parameters}, {json_request}')
 
@@ -315,8 +340,8 @@ class Swagger:
         method_name = self.name(data, check_tag=True)
         service = self.service_name().lower()
         subclass = re.sub(r'\B([A-Z])', r'_\1', data["tag"]).lower()
-        test = f'''def test_{method}_{method_name}(app, data_{method_name}):
-    data = data_{method_name}
+        test = f'''def test_{method}_{method_name}(app, data_{method}_{method_name}):
+    data = data_{method}_{method_name}
     response = app.{service}.{subclass}.{method}_{method_name}(data)
     assert response.status_code == data["expected"]["status_code"]
         
@@ -325,7 +350,8 @@ class Swagger:
 
     def _init_all_classes_in_methods(self):
         result = []
-        s = f"""import requests
+        s = f"""# -*- coding: windows-1251 -*-
+import requests
 from requests.models import Response
 from ozlogger.step_wrapper import step
 
@@ -358,8 +384,9 @@ class {self.service_name()}:
 
     def write_all_methods_layer(self):
         service_name = self.service_name().lower()
-        Path(f'services').mkdir(parents=True, exist_ok=True)
-        with open(f'services/{service_name}.py', 'w') as methods_layer:
+        base_path = Path(self.folder).joinpath('services')
+        base_path.mkdir(parents=True, exist_ok=True)
+        with open(base_path.joinpath(f'{service_name}.py'), 'w') as methods_layer:
             for _ in self._init_all_classes_in_methods():
                 methods_layer.write(_)
             for _ in self._all_methods_code().values():
@@ -368,8 +395,9 @@ class {self.service_name()}:
 
     def write_all_tests_layer(self):
         service_name = self.service_name().lower()
-        Path(f'tests').mkdir(parents=True, exist_ok=True)
-        with open(f'tests/test_{service_name}.py', 'w') as tests_layer:
+        base_path = Path(self.folder).joinpath('tests')
+        base_path.mkdir(parents=True, exist_ok=True)
+        with open(base_path.joinpath(f'test_{service_name}.py'), 'w') as tests_layer:
             for _ in self.methods():
                 tests_layer.write(self.code_of_test_method(_))
 
@@ -406,11 +434,11 @@ class {self.service_name()}:
         method = data["method"]
         service_name = self.service_name().lower()
         method_name = self.name(data, check_tag=True)
-        Path(f'data/{service_name}').mkdir(parents=True, exist_ok=True)
-        file = f'data/{service_name}/{method}_{method_name}.py'
+        base_path = Path(self.folder).joinpath('data', service_name)
+        base_path.mkdir(parents=True, exist_ok=True)
+        file = f'{base_path}/{method}_{method_name}.py'
         if not Path(file).is_file():
             with open(file, 'w') as f:
-                # f.write(f'test_data = [\n{pprint.pformat(self.create_test_data(data))}\n]')
                 f.write(f'test_data = {json.dumps([self.create_test_data(data)], indent=4)}')
         else:
             print(f'Файл {file} уже существует')
@@ -428,22 +456,24 @@ class Application:
         self.api = RestClient(host=base_url, headers=headers)
         '''
         if write:
-            Path('fixture').mkdir(parents=True, exist_ok=True)
-            if not Path('fixture/application.py').is_file():
-                with open('fixture/application.py', 'w') as f:
+            base_path = Path(self.folder).joinpath('fixture')
+            base_path.mkdir(parents=True, exist_ok=True)
+            file = base_path.joinpath('application.py')
+            if not file.is_file():
+                with open(file, 'w') as f:
                     f.write(app_sting)
         return app_sting
 
     def create_folders(self):
         service_name = self.service_name().lower()
-        Path('fixture').mkdir(parents=True, exist_ok=True)
-        Path(f'services').mkdir(parents=True, exist_ok=True)
-        Path(f'data/{service_name}').mkdir(parents=True, exist_ok=True)
-        Path('tests').mkdir(parents=True, exist_ok=True)
+        Path(self.folder).joinpath('fixture').mkdir(parents=True, exist_ok=True)
+        Path(self.folder).joinpath(f'services').mkdir(parents=True, exist_ok=True)
+        Path(self.folder).joinpath(f'data/{service_name}').mkdir(parents=True, exist_ok=True)
+        Path(self.folder).joinpath('tests').mkdir(parents=True, exist_ok=True)
 
     def add_code_of_method(self, data):
         tag, code = self.code_of_method(data)
-        path = f'services/{self.service_name().lower()}.py'
+        path = Path(self.folder).joinpath('services', f'{self.service_name().lower()}.py')
         file = open(path).readlines()
         index = file.index(f'    class _{tag.capitalize()}:\n') + 3
         for i in code.split('\n'):
@@ -458,5 +488,3 @@ class Application:
         with open(path, 'w') as f:
             for i in file:
                 f.write(i)
-
-

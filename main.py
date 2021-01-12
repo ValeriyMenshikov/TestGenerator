@@ -9,7 +9,7 @@ if __name__ == '__main__':
     root = Tk()
     root.withdraw()
     folder_selected = filedialog.askdirectory()
-    os.chdir(folder_selected)
+    # os.chdir(folder_selected)
     while True:
         url = str(input('Введи Swagger url:'))
         regex = re.compile(
@@ -21,7 +21,7 @@ if __name__ == '__main__':
             r'(?:/?|[/?]\S+)$', re.IGNORECASE)
 
         if re.match(regex, url) is not None:
-            sw = Swagger(url=url)
+            sw = Swagger(url=url, folder=folder_selected)
             break
         else:
             print('Введен не верный url адрес')
@@ -87,8 +87,8 @@ if __name__ == '__main__':
                 if method['method'] == selected_method and method['end_point'] == selected_endpoint:
                     sw.write_test_data(method)
                     service_name = sw.service_name().lower()
-                    test_file = f'tests/test_{service_name}.py'
-                    if Path(test_file).is_file():
+                    test_file = Path(folder_selected).joinpath('tests', f'test_{service_name}.py')
+                    if test_file.is_file():
                         test = sw.code_of_test_method(method)
                         with open(test_file, 'r+') as f:
                             if test.strip() in f.read():
