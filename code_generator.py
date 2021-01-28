@@ -37,26 +37,18 @@ class Swagger:
     #     with open(url, errors='ignore', encoding='UTF-8') as f:
     #         self.swagger_dict = json.load(f)
 
-    def create_qa_config(self, path):
-        with open(Path(path).joinpath('qa.yaml'), 'w') as qa:
-            qa.write(f"""api:
-  host: {self.host_name}
-user:
-  user: testuser
-  password: test
-  store: 15707897807000""")
-
-    def create_env(self, requirements_path):
-        if not os.path.exists(self.folder):
-            subprocess.call([sys.executable, '-m', 'venv', self.folder])
+    def create_env(self, requirements_path='config_helper/requirements.txt'):
+        folder = os.path.join(self.folder, 'venv')
+        if not os.path.exists(os.path.join(folder, 'venv')):
+            subprocess.call([sys.executable, '-m', 'venv', folder])
             if platform == "win32":
-                python_interpreter = os.path.join(self.folder, 'Scripts', 'python.exe')
+                python_interpreter = os.path.join(folder, 'Scripts', 'python.exe')
             else:
-                python_interpreter = os.path.join(self.folder, 'bin', 'python')
+                python_interpreter = os.path.join(folder, 'bin', 'python')
             subprocess.call([python_interpreter, '-m', 'pip', 'install', '--upgrade', 'pip'])
             subprocess.call([python_interpreter, '-m', 'pip', 'install', '-r', requirements_path])
         else:
-            print("INFO: %s exists." % (self.folder))
+            print("INFO: %s exists." % (folder))
 
     def all(self):
         """
@@ -284,6 +276,7 @@ user:
         return end_point
 
     def code_of_method(self, data):
+        service_name = self.service_name().lower()
         data = self._check_input(data)
         parameters = self.parameters(data)
         description = self.description(data)
@@ -303,26 +296,26 @@ user:
         @step('{description}')
         def {method}_{method_name}(self, data: dict) -> Response:
             end_point = f'{end_point}'
-            return self.app.api.{method}(end_point, **data["request"])""".format(
+            return self.app.{service_name}_api.{method}(end_point, **data["request"])""".format(
                 **path_parameters)
         elif any([params, json_request, headers]) and not path_parameters:
             code = f"""
         @step('{description}')
         def {method}_{method_name}(self, data: dict) -> Response:
             end_point = f'{end_point}'
-            return self.app.api.{method}(end_point, **data["request"])"""
+            return self.app.{service_name}_api.{method}(end_point, **data["request"])"""
         elif params == json_request == headers == path_parameters is None:
             code = f"""
         @step('{description}')
         def {method}_{method_name}(self) -> Response:
             end_point = f'{end_point}'
-            return self.app.api.{method}(end_point)"""
+            return self.app.{service_name}_api.{method}(end_point)"""
         elif params == json_request == headers is None and path_parameters:
             code = f"""
         @step('{description}')
         def {method}_{method_name}(self, data: dict) -> Response:
             end_point = f'{end_point}'
-            return self.app.api.{method}(end_point)""".format(**path_parameters)
+            return self.app.{service_name}_api.{method}(end_point)""".format(**path_parameters)
         else:
             raise AssertionError(f'Не обработанный случай, {data}, {params}, {path_parameters}, {json_request}')
 
@@ -453,7 +446,7 @@ class Application:
     def __init__(self, base_url=None, headers=None):
         self.{service_name.lower()} = {service_name}(self)
         self.base_url = base_url
-        self.api = RestClient(host=base_url, headers=headers)
+        self.{service_name.lower()}_api = RestClient(host=base_url, headers=headers)
         '''
         if write:
             base_path = Path(self.folder).joinpath('fixture')

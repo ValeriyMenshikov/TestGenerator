@@ -1,0 +1,9 @@
+--extra-index-url https://nexus.s.o3.ru/repository/pypi-all/simple/
+pytest
+allure-pytest
+pyodbc
+requests
+vyper-config
+attrs==19.1.0
+ozlogger
+ozrestclient
