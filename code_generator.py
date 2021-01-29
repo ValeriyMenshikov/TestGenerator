@@ -39,7 +39,7 @@ class Swagger:
 
     def create_env(self, requirements_path='config_helper/requirements.txt'):
         folder = os.path.join(self.folder, 'venv')
-        if not os.path.exists(os.path.join(folder, 'venv')):
+        if not os.path.exists(os.path.join(folder)):
             subprocess.call([sys.executable, '-m', 'venv', folder])
             if platform == "win32":
                 python_interpreter = os.path.join(folder, 'Scripts', 'python.exe')
