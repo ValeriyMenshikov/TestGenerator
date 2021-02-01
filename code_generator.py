@@ -407,7 +407,7 @@ class {self.service_name()}:
         td = {
             'test_name': f'test {method}_{method_name}',
             'expected': {
-                'status_code': self.status_code(data)
+                'status_code': int(self.status_code(data))
             }
         }
         if any([params, headers, json_request]):
