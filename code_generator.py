@@ -221,6 +221,161 @@ class Swagger:
 
         return result
 
+    def _model_dict_v2(self, data):
+        """
+        Вспомогательный метод который определяет есть ли у метода описание request\response модели
+        и если есть то возвращает описание этих моделей в виде списка словарей
+
+        :param data: Кортеж в формате (тип метода, название метода)
+        :return: Список кортежей с request и response моделями
+        """
+
+        method = data["method"]
+        end_point = data["end_point"]
+
+        result = []
+        requestBody = self.swagger_dict['paths'][end_point][method].get('requestBody')
+        responseBody = self.swagger_dict['paths'][end_point][method].get('responses')
+        if requestBody:
+            if requestBody['content'].get('application/json'):
+                request_model_name = requestBody['content']['application/json']['schema']['$ref'].split('/')[-1]
+            elif requestBody['content']['multipart/form-data']['schema'].get('$ref'):
+                request_model_name = requestBody['content']['multipart/form-data']['schema']['$ref'].split('/')[
+                    -1]
+            elif requestBody['content']['multipart/form-data']['schema']['properties']['name'].get('$ref'):
+                request_model_name = \
+                    requestBody['content']['multipart/form-data']['schema']['properties']['name']['$ref'].split(
+                        '/')[-1]
+
+            result.append(
+                (self.swagger_dict['components']['schemas'][request_model_name]['properties'],
+                 request_model_name)
+            )
+        if responseBody:
+            status_code = self.status_code(data)
+            if responseBody[status_code].get('content'):
+                response_name_model = \
+                    responseBody[status_code]['content']['application/json']['schema']['$ref'].split('/')[-1]
+                result.append(
+                    (self.swagger_dict['components']['schemas'][response_name_model]['properties'],
+                     response_name_model)
+                )
+        return result
+
+    def _method_model_v2(self, dictionary, model_name):
+        """
+        Вспомогательный метод который раскрывает и формирует request\response модель данных
+
+        :param dictionary: Json(Словарь) в котором лежит опиание модели
+        :param model_name: Название модели в которой лежит описание
+        :return: описание request\response модели данных метода
+        """
+        d = 'class ' + model_name + '(Model):\n'
+        global temp
+        if isinstance(dictionary, dict):
+            for k, v in dictionary.items():
+                check_key = v.get('type')
+                if check_key == 'number' or check_key == 'integer':
+                    d += f'\t{k} = IntField()\n'
+                elif check_key == 'array':
+                    if v.get('$ref'):
+                        model = v['$ref'].split('/')[-1]
+                        d += f'\t{k} = ListField({model})\n'
+                        dd.setdefault(model, v['$ref'])
+                    elif v['items'].get('$ref'):
+                        model = v['items']['$ref'].split('/')[-1]
+                        if self.swagger_dict['components']['schemas'][model].get('enum'):
+                            d += f'\t{k} = ListField()\n'
+                        elif self.swagger_dict['components']['schemas'].get(model):
+                            if model not in temp:
+                                d += f'\t{k} = ListField({model})\n'
+                                dd.setdefault(model, v['items']['$ref'])
+                            else:
+                                d += f'\t{k} = ListField()\n'
+
+                    elif v['items'].get('type'):
+                        d += f'\t{k} = ListField()\n'
+                elif check_key == 'boolean':
+                    d += f'\t{k} = BoolField()\n'
+                elif check_key == 'string':
+                    d += f'\t{k} = StringField()\n'
+                elif not check_key:
+                    if v.get('$ref'):
+                        model = v['$ref'].split('/')[-1]
+                        if self.swagger_dict['components']['schemas'][model].get('enum'):
+                            d += f'\t{k} = StringField()\n'
+                        else:
+                            d += f'\t{k} = EmbeddedField({model})\n'
+                            dd.setdefault(model, v['$ref'])
+
+        results.append(d)
+
+        try:
+            for k, v in dd.items():
+                temp = k
+                dd.pop(k)
+                self._method_model_v2(self.swagger_dict['components']['schemas'][temp]['properties'], temp)
+
+        except RuntimeError:
+            pass
+
+        return results
+
+    def _request_json_parameters(self, data):
+        """
+        Вспомогательный метод который из request модели собирает список параметров, при этом переименовывая
+        переменные, чтобы была понятна структура вложенности и избавлясь от родительских переменных
+
+        :param data: Кортеж в формате (тип метода, название метода)
+        :return: Набор параметров которые описаны в request модели метода
+        """
+        res = []
+        for v1, v2 in self._model_dict_v2(data):
+            m = self._method_model_v2(v1, v2)
+            if 'Response' not in str(m):
+                for i in m:
+                    match1 = re.search(r'class .*Request\(Model\):?', i)
+                    match2 = re.search(r'class .*\(Model\):?', i)
+                    if match1:
+                        i = i.replace(match1.group(), '')
+                        for j in i.split('\n'):
+                            if 'EmbeddedField' not in j:
+                                value = j.split('=')[0].strip()
+                                if value != '':
+                                    res.append(value)
+                    elif 'Request' not in match2.group():
+                        service_name = self.service_name()
+                        temp_value = re.sub(f'({service_name})|(class )|(Model)|([():])', '', match2.group())
+                        i = i.replace(match2.group(), '')
+                        for j in i.split('\n'):
+                            if 'EmbeddedField' not in j:
+                                value = j.split('=')[0].strip()
+                                if value != '':
+                                    res.append(temp_value + value.capitalize())
+        global results
+        results = []
+        return res
+
+    def models(self, data):
+        """
+        Метод формирует код итоговой request\response модели с импортами и записывает в словарь
+
+        :param data: Кортеж в формате (тип метода, название метода)
+        :return: Словарь с request\response моделями
+        """
+        imports = 'from ozmodel.model import Model\n' + \
+                  'from jsonmodels.fields import StringField, IntField, ListField, EmbeddedField, BoolField\n\n\n'
+        global results
+        res = {}
+        for v1, v2 in self._model_dict_v2(data):
+            m = self._method_model_v2(v1, v2)
+            if 'Response' in str(m):
+                res['Response'] = imports + '\n\n'.join(reversed(m))
+            elif 'Request' in str(m):
+                res['Request'] = imports + '\n\n'.join(reversed(m))
+            results = []
+        return res
+
     def request_model(self, data):
         r = str(self._model_dict(data))
         count = 0
