@@ -23,7 +23,7 @@ class Swagger:
     PUT = 'put'
     DELETE = 'delete'
 
-    def __init__(self, url=None, obj=None, folder=None):
+    def __init__(self, url=None, obj=None, folder=os.path.abspath(os.curdir)):
         if url:
             self.swagger_dict = requests.get(url).json()
         elif obj:
@@ -375,6 +375,16 @@ class Swagger:
                 res['Request'] = imports + '\n\n'.join(reversed(m))
             results = []
         return res
+
+    def write_models(self, data, m):
+        path = Path(self.folder).joinpath('models', self.service_name().lower())
+
+        if not path.exists():
+            path.mkdir(parents=True, exist_ok=True)
+
+        if m:
+            with open(f'{path}/{self.name(data)}_request_model.py', 'w') as f:
+                f.write(m)
 
     def request_model(self, data):
         r = str(self._model_dict(data))

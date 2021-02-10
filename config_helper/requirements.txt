@@ -7,3 +7,4 @@ vyper-config
 attrs==19.1.0
 ozlogger
 ozrestclient
+ozmodel
