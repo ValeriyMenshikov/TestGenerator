@@ -162,7 +162,7 @@ class Swagger:
         result = {}
         try:
             add = lambda param_type, params: result[param_type].update(
-                {params.get("name"): params["schema"].get("type") if params.get("schema") else params["type"]})
+                {params.get("name"): params["schema"].get("type", 'None') if params.get("schema") else params.get("type")})
             if self.swagger_dict['paths'][end_point][method].get("parameters"):
                 for path_param in self.swagger_dict['paths'][end_point][method]["parameters"]:
                     result.setdefault(path_param.get("in"), {})
@@ -203,15 +203,18 @@ class Swagger:
                             request_body['content']['multipart/form-data']['schema']['properties']['name']['$ref'])
                     elif count == 3:
                         model = m(request_body['content']['application/json']['schema']['$ref'])
+                    elif count == 4:
+                        result = request_body['content']['multipart/form-data']['schema']
+                        break
                     else:
                         break
                     for k, v in self.swagger_dict['components']['schemas'][model]['properties'].items():
-                        if v.get('type') == 'array' and '$ref' in v.get('items'):
+                        if v.get('type') == 'array' and '$ref' in v.get('items', 'None'):
                             result[k] = [m(v['items']['$ref'])]
                         elif v.get('type') == 'array':
                             result[k] = []
                         else:
-                            result[k] = v.get('type')
+                            result[k] = v.get('type', 'None')
                     if count >= 2:
                         break
                 except KeyError:
@@ -584,12 +587,10 @@ class {self.service_name()}:
         if headers:
             td['request']['headers'] = headers
         if self._check_request_body(data):
-            try:
+            if json_request.get('type') == 'object':
+                td['request']['data'] = ['files']
+            else:
                 td['request']['json'] = json_request
-            except KeyError:
-                td['request'] = {}
-                td['request']['json'] = json_request
-
         if path_parameters:
             td['path'] = path_parameters
         return td
