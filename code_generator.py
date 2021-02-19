@@ -563,7 +563,7 @@ class {self.service_name()}:
         base_path = Path(self.folder).joinpath('tests')
         base_path.mkdir(parents=True, exist_ok=True)
         with open(base_path.joinpath(f'test_{service_name}.py'), 'w') as tests_layer:
-            tests_layer.write('import allure\n\n')
+            tests_layer.write('import allure\n\n\n')
             for _ in self.methods():
                 tests_layer.write(self.code_of_test_method(_))
 
