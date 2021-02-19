@@ -500,11 +500,13 @@ class Swagger:
         :return: Строка с готовым кодом теста
         """
         method = data["method"]
+        description = self.description(data)
         method_name = self.name(data, check_tag=True)
         service = self.service_name().lower()
         subclass = re.sub(r'\B([A-Z])', r'_\1', data["tag"]).lower()
-        test = f'''def test_{method}_{method_name}(app, data_{method}_{method_name}):
-    data = data_{method}_{method_name}
+        test = f'''@allure.story('{description}')
+def test_{subclass}_{method}_{method_name}(app, data_{subclass}_{method}_{method_name}):
+    data = data_{subclass}_{method}_{method_name}
     response = app.{service}.{subclass}.{method}_{method_name}(data)
     assert response.status_code == data["expected"]["status_code"]
         
@@ -561,6 +563,7 @@ class {self.service_name()}:
         base_path = Path(self.folder).joinpath('tests')
         base_path.mkdir(parents=True, exist_ok=True)
         with open(base_path.joinpath(f'test_{service_name}.py'), 'w') as tests_layer:
+            tests_layer.write('import allure\n\n')
             for _ in self.methods():
                 tests_layer.write(self.code_of_test_method(_))
 
@@ -598,11 +601,12 @@ class {self.service_name()}:
     def write_test_data(self, data):
         data = self._check_input(data)
         method = data["method"]
+        subclass = re.sub(r'\B([A-Z])', r'_\1', data["tag"]).lower()
         service_name = self.service_name().lower()
         method_name = self.name(data, check_tag=True)
         base_path = Path(self.folder).joinpath('data', service_name)
         base_path.mkdir(parents=True, exist_ok=True)
-        file = f'{base_path}/{method}_{method_name}.py'
+        file = f'{base_path}/{subclass}_{method}_{method_name}.py'
         if not Path(file).is_file():
             with open(file, 'w') as f:
                 f.write(f'test_data = {json.dumps([self.create_test_data(data)], indent=4)}')
