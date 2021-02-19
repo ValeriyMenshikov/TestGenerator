@@ -201,8 +201,10 @@ class Swagger:
                     elif count == 2:
                         model = m(
                             request_body['content']['multipart/form-data']['schema']['properties']['name']['$ref'])
-                    else:
+                    elif count == 3:
                         model = m(request_body['content']['application/json']['schema']['$ref'])
+                    else:
+                        break
                     for k, v in self.swagger_dict['components']['schemas'][model]['properties'].items():
                         if v.get('type') == 'array' and '$ref' in v.get('items'):
                             result[k] = [m(v['items']['$ref'])]
@@ -582,7 +584,12 @@ class {self.service_name()}:
         if headers:
             td['request']['headers'] = headers
         if self._check_request_body(data):
-            td['request']['json'] = json_request
+            try:
+                td['request']['json'] = json_request
+            except KeyError:
+                td['request'] = {}
+                td['request']['json'] = json_request
+
         if path_parameters:
             td['path'] = path_parameters
         return td

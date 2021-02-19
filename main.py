@@ -37,8 +37,9 @@ if __name__ == '__main__':
         if new in ['1', 1]:
             sw.create_app_fixture(write=True)
             for i in sw.methods():
+                print(i)
                 sw.write_test_data(i)
-                sw.write_models(i, sw.models(i).get("Request"))
+                # sw.write_models(i, sw.models(i).get("Request"))
             sw.write_all_tests_layer()
             sw.write_all_methods_layer()
             break
@@ -86,8 +87,8 @@ if __name__ == '__main__':
             for method in sw.methods():
                 if method['method'] == selected_method and method['end_point'] == selected_endpoint:
                     sw.write_test_data(method)
-                    sw.models(method)
-                    sw.write_models(method, sw.models(method).get("Request"))
+                    # sw.models(method)
+                    # sw.write_models(method, sw.models(method).get("Request"))
                     service_name = sw.service_name().lower()
                     test_file = Path(folder_selected).joinpath('tests', f'test_{service_name}.py')
                     if test_file.is_file():
