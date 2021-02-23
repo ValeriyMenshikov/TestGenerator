@@ -504,13 +504,27 @@ class Swagger:
         method_name = self.name(data, check_tag=True)
         service = self.service_name().lower()
         subclass = re.sub(r'\B([A-Z])', r'_\1', data["tag"]).lower()
-        test = f'''@allure.story('{description}')
+        parameters = self.parameters(data)
+        params = parameters.get('query') if parameters else None
+        headers = parameters.get('header') if parameters else None
+        path_parameters = parameters.get('path') if parameters else None
+        json_request = self.request_model(data)
+        if any([params, headers, json_request, path_parameters]):
+            test = f'''@allure.story('{description}')
 def test_{subclass}_{method}_{method_name}(app, data_{subclass}_{method}_{method_name}):
     data = data_{subclass}_{method}_{method_name}
     response = app.{service}.{subclass}.{method}_{method_name}(data)
     assert response.status_code == data["expected"]["status_code"]
-        
-        '''
+            
+            '''
+        else:
+            test = f'''@allure.story('{description}')
+def test_{subclass}_{method}_{method_name}(app, data_{subclass}_{method}_{method_name}):
+    data = data_{subclass}_{method}_{method_name}
+    response = app.{service}.{subclass}.{method}_{method_name}()
+    assert response.status_code == data["expected"]["status_code"]
+
+            '''
         return test + '\n'
 
     def _init_all_classes_in_methods(self):
@@ -570,9 +584,9 @@ import allure\n\n\n''')
     def create_test_data(self, data):
         data = self._check_input(data)
         method = data["method"]
-        parameters = self.parameters(data)
         method_name = self.name(data, check_tag=True)
         json_request = self.request_model(data)
+        parameters = self.parameters(data)
         params = parameters.get('query') if parameters else None
         headers = parameters.get('header') if parameters else None
         path_parameters = parameters.get('path') if parameters else None
