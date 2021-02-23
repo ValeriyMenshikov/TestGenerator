@@ -576,11 +576,12 @@ import allure\n\n\n''')
         params = parameters.get('query') if parameters else None
         headers = parameters.get('header') if parameters else None
         path_parameters = parameters.get('path') if parameters else None
+        status_code = self.status_code(data)
 
         td = {
             'test_name': f'test {method}_{method_name}',
             'expected': {
-                'status_code': int(self.status_code(data))
+                'status_code': int(status_code) if status_code.isdigit() else status_code
             }
         }
         if any([params, headers, json_request]):
