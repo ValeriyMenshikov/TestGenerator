@@ -645,6 +645,7 @@ class Application:
             tag, code = self.code_of_method(data)
             path = Path(self.folder).joinpath('services', f'{self.service_name().lower()}.py')
             if not path.is_file():
+                self.create_app_fixture(write=True)
                 with open(path, 'w') as methods_layer:
                     for _ in self._init_all_classes_in_methods():
                         methods_layer.write(_)
