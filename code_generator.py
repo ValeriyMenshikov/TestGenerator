@@ -516,7 +516,6 @@ def test_{subclass}_{method}_{method_name}(app, data_{subclass}_{method}_{method
     def _init_all_classes_in_methods(self):
         result = []
         s = f"""# -*- coding: windows-1251 -*-
-import requests
 from requests.models import Response
 from ozlogger.step_wrapper import step
 
@@ -526,7 +525,7 @@ class {self.service_name()}:
         result.append(s)
         for mtd in self.methods():
             subclass = re.sub(r'\B([A-Z])', r'_\1', mtd["tag"]).lower()
-            i = f'        self.{subclass} = self._{mtd["tag"].capitalize()}(app)\n'
+            i = f'        self.{subclass} = self._{mtd["tag"]}(app)\n'
             if i not in result:
                 result.append(i)
         return result
@@ -537,7 +536,7 @@ class {self.service_name()}:
             results.setdefault(mtd["tag"], [])
             tag, code = self.code_of_method(mtd)
             s = f"""
-    class _{tag.capitalize()}:
+    class _{tag}:
         def __init__(self, app):
             self.app = app\n"""
             if tag in results:
@@ -642,19 +641,55 @@ class Application:
         Path(self.folder).joinpath('tests').mkdir(parents=True, exist_ok=True)
 
     def add_code_of_method(self, data):
-        tag, code = self.code_of_method(data)
-        path = Path(self.folder).joinpath('services', f'{self.service_name().lower()}.py')
-        file = open(path).readlines()
-        index = file.index(f'    class _{tag.capitalize()}:\n') + 3
-        for i in code.split('\n'):
-            file.insert(index, i + '\n')
-            index = index + 1
+        try:
+            tag, code = self.code_of_method(data)
+            path = Path(self.folder).joinpath('services', f'{self.service_name().lower()}.py')
+            if not path.is_file():
+                with open(path, 'w') as methods_layer:
+                    for _ in self._init_all_classes_in_methods():
+                        methods_layer.write(_)
 
-        with open(path, 'r') as f:
-            if code.strip() in f.read():
-                print('Код данного метода уже существует!')
-                return
+                    results = {}
+                    for mtd in self.methods():
+                        results.setdefault(mtd["tag"], [])
+                        tag, code = self.code_of_method(mtd)
+                        s = f"""
+    class _{tag}:
+        def __init__(self, app):
+            self.app = app\n"""
 
-        with open(path, 'w') as f:
-            for i in file:
-                f.write(i)
+                        if tag in results:
+                            if s not in results[tag]:
+                                results[tag].append(s)
+
+                    for _ in results.values():
+                        for __ in _:
+                            methods_layer.write(__)
+
+
+            file = open(path).readlines()
+
+            try:
+                index = list(map(str.lower, file)).index(f'    class _{tag.lower()}:\n') + 3
+                for i in code.split('\n'):
+                    file.insert(index, i + '\n')
+                    index = index + 1
+
+            except ValueError:
+                print(f"При добавлении метода {data}\nв класс {tag} произошла ошибка, код мог быть сгенерирован не корректно")
+                with open(path, 'a') as f:
+                    f.write('\n"""\nНе был найден нужный подкласс код данного метода был сгенерирован без привязки к подклассу\n')
+                    f.write(code)
+                    f.write('\n"""\n\n ')
+
+            with open(path, 'r') as f:
+                if code.strip() in f.read():
+                    print('Код данного метода уже существует!')
+                    return
+
+            with open(path, 'w') as f:
+                for i in file:
+                    f.write(i)
+
+        except BaseException as error:
+            print(f"В методе add_code_of_method произошла ошибка '{error}'!!! код мог быть сгенерирован не корректно")
