@@ -726,9 +726,10 @@ class Application:
                 """)
 
     def copy_requirements(self):
-        path = Path(self.folder).joinpath('requirements.txt')
-        if not path.is_file():
-            shutil.copy('config_helper/requirements.txt', path)
+        destination_path = Path(self.folder).joinpath('requirements.txt')
+        source_path = Path('config_helper').joinpath('requirements.txt')
+        if not destination_path.is_file():
+            shutil.copy(source_path, destination_path)
 
 
 
