@@ -25,6 +25,7 @@ if __name__ == '__main__':
             sw.create_env()
             sw.create_config()
             sw.create_conftest()
+            sw.copy_requirements()
             break
         else:
             print('Введен не верный url адрес')

@@ -8,6 +8,7 @@ import subprocess
 import sys
 import os
 import datetime
+import shutil
 
 now = datetime.datetime.now()
 now.strftime("%Y-%m-%d_%H_%M")
@@ -723,6 +724,12 @@ class Application:
   host: {self.host_name}
   headers: {{}}
                 """)
+
+    def copy_requirements(self):
+        path = Path(self.folder).joinpath('requirements.txt')
+        shutil.copy('config_helper/requirements.txt', path)
+
+
 
     def create_conftest(self):
         path = Path(self.folder).joinpath('conftest.py')
