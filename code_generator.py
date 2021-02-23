@@ -727,7 +727,8 @@ class Application:
 
     def copy_requirements(self):
         path = Path(self.folder).joinpath('requirements.txt')
-        shutil.copy('config_helper/requirements.txt', path)
+        if not path.is_file():
+            shutil.copy('config_helper/requirements.txt', path)
 
 
 
