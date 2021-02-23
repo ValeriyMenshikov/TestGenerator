@@ -653,15 +653,15 @@ class Application:
                     results = {}
                     for mtd in self.methods():
                         results.setdefault(mtd["tag"], [])
-                        tag, code = self.code_of_method(mtd)
+                        tag1, code1 = self.code_of_method(mtd)
                         s = f"""
-    class _{tag}:
+    class _{tag1}:
         def __init__(self, app):
             self.app = app\n"""
 
-                        if tag in results:
-                            if s not in results[tag]:
-                                results[tag].append(s)
+                        if tag1 in results:
+                            if s not in results[tag1]:
+                                results[tag1].append(s)
 
                     for _ in results.values():
                         for __ in _:

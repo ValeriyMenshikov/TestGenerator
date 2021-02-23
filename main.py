@@ -97,11 +97,10 @@ if __name__ == '__main__':
                             if test.strip() in f.read():
                                 print('Код для такого теста уже существует')
                             else:
-                                if 'import allure' not in f.read():
-                                    f.write('import allure\n\n\n')
                                 f.write(test)
                     else:
                         with open(test_file, 'w') as f:
+                            f.write('import allure\n\n\n')
                             f.write(sw.code_of_test_method(method))
 
                     sw.add_code_of_method(method)
