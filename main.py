@@ -23,6 +23,8 @@ if __name__ == '__main__':
         if re.match(regex, url) is not None:
             sw = Swagger(url=url, folder=folder_selected)
             sw.create_env()
+            sw.create_config()
+            sw.create_conftest()
             break
         else:
             print('Введен не верный url адрес')
@@ -100,6 +102,7 @@ if __name__ == '__main__':
                                 f.write(test)
                     else:
                         with open(test_file, 'w') as f:
+                            f.write('# -*- coding: windows-1251 -*-\n')
                             f.write('import allure\n\n\n')
                             f.write(sw.code_of_test_method(method))
 

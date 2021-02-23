@@ -562,7 +562,8 @@ class {self.service_name()}:
         base_path = Path(self.folder).joinpath('tests')
         base_path.mkdir(parents=True, exist_ok=True)
         with open(base_path.joinpath(f'test_{service_name}.py'), 'w') as tests_layer:
-            tests_layer.write('import allure\n\n\n')
+            tests_layer.write('''# -*- coding: windows-1251 -*-
+import allure\n\n\n''')
             for _ in self.methods():
                 tests_layer.write(self.code_of_test_method(_))
 
@@ -619,10 +620,11 @@ from services.{service_name.lower()} import {service_name}
         
         
 class Application:
-    def __init__(self, base_url=None, headers=None):
+    def __init__(self, host=None, headers=None):
         self.{service_name.lower()} = {service_name}(self)
-        self.base_url = base_url
-        self.{service_name.lower()}_api = RestClient(host=base_url, headers=headers)
+        self.host = host
+        self.headers = headers
+        self.{service_name.lower()}_api = RestClient(host=host, headers=headers)
         '''
         if write:
             base_path = Path(self.folder).joinpath('fixture')
@@ -694,3 +696,80 @@ class Application:
 
         except BaseException as error:
             print(f"В методе add_code_of_method произошла ошибка '{error}'!!! код мог быть сгенерирован не корректно")
+
+    def create_config(self):
+        path = Path(self.folder).joinpath('config')
+        if not path.is_dir():
+            path.mkdir(parents=True, exist_ok=True)
+        file = path.joinpath("qa.yaml")
+        if not file.is_file():
+            with open(file, 'w') as f:
+                f.write(f"""api:
+  host: {self.host_name}
+  headers: {{}}
+                """)
+
+    def create_conftest(self):
+        path = Path(self.folder).joinpath('conftest.py')
+        if not path.is_file():
+            with open(path, 'w') as f:
+                f.write("""
+import pytest
+import os.path
+import importlib
+from fixture.application import Application
+from vyper import v
+from ozlogger import init_log
+
+YAML_FILES = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config')
+
+option_list = (
+    'api.host',
+    'api.headers',
+)
+
+
+def pytest_addoption(parser):
+    parser.addoption('--env', action='store', default='qa')
+    for option in option_list:
+        parser.addoption(f'--{option}', action='store', default=None)
+
+
+def init_config(request):
+    config_name = request.config.getoption('--env')
+    v.set_config_name(config_name)
+    v.set_config_type('yaml')
+    v.add_config_path(YAML_FILES)
+    v.read_in_config()
+    for option in option_list:
+        value = request.config.getoption(f'--{option}')
+        if value:
+            v.set(option, value)
+
+
+@pytest.fixture(scope='session')
+def app(request):
+    init_config(request)
+    init_log.json_renderer(show_curl=True)
+    fixture = Application(
+        host=v.get("api.host"),
+        headers=v.get("api.headers")
+    )
+    return fixture
+
+
+def pytest_generate_tests(metafunc):
+    for fixture in metafunc.fixturenames:
+        if fixture.startswith("data_"):
+            test_data = load_from_module(fixture[5:])
+            metafunc.parametrize(fixture, test_data, ids=[x.get('test_name', 'None') for x in test_data])
+
+
+def load_from_module(module):
+    base_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
+    for file in os.listdir(base_path):
+        path_to_file = os.path.join(base_path, file)
+        if os.path.isdir(path_to_file) and f'{module}.py' in os.listdir(path_to_file):
+            return importlib.import_module(f'data.{file}.{module}').test_data
+
+            """)
